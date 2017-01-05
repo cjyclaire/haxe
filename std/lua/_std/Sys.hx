@@ -48,16 +48,8 @@ class Sys {
 		return args;
 	}
 	public static function command( cmd : String, ?args : Array<String> ) : Int  {
-		cmd = Boot.shellEscapeCmd(cmd, args);
-#if (lua_ver < 5.2)
-		return Os.execute(cmd);
-#elseif (lua_ver >= 5.2)
-		return Os.execute(cmd).status;
-#else
-		var ret = TableTools.pack(untyped Os.execute(cmd));
-		if (ret[3] != null) return ret[3]
-		else return ret[1];
-#end
+		var p = new sys.io.Process(cmd, args);
+		return p.exitCode();
 	}
 
 

@@ -462,34 +462,23 @@ class RunCi {
 	static function getLuaDependencies(){
 		switch (systemName){
 			case "Linux": requireAptPackages(["libpcre3-dev"]);
-			case "Mac": runCommand("brew", ["install", "pcre"]);
+			case "Mac": {
+			  runCommand("brew", ["install", "pcre"]);
+			  runCommand("brew", ["install", "python"]);
+			  runCommand("ulimit", ["-n", "10480"]); // workaround strange file limit problem
+			}
 		}
+		runCommand("pip", ["install", "hererocks"]);
 	}
 
-	static function requireLibs(libs : Array<String>){
-	  switch(systemName){
-	    case "Linux" : runCommand("apt-get", ["install"].concat(libs));
-	    case "Mac" : runCommand("brew", ["install"].concat(libs));
+	static function installLuaVersionDependencies(lv:String){
+	  if (lv == "-l5.1"){
+	    runCommand("luarocks", ["install", "bit32", "5.3.0-1", "--server=https://luarocks.org/dev"]);
 	  }
-	}
-
-	static function removeLibs(libs : Array<String>){
-	  switch(systemName){
-	    case "Linux" : runCommand("apt-get", ["remove"].concat(libs));
-	    case "Mac" : runCommand("brew", ["remove"].concat(libs));
-	  }
-	}
-
-	static function installLuaVersionDependencies(version: String){
-	  requireLibs([version, "luarocks"]);
-	  runCommand("luarocks", ["install", "lrexlib-pcre", "2.7.2-1", "--server=https://luarocks.org/dev"]);
+	  runCommand("luarocks", ["install", "lrexlib-pcre", "2.8.0-1", "--server=https://luarocks.org/dev"]);
 	  runCommand("luarocks", ["install", "luv", "1.9.1-0", "--server=https://luarocks.org/dev"]);
 	  runCommand("luarocks", ["install", "luasocket", "3.0rc1-2", "--server=https://luarocks.org/dev"]);
 	  runCommand("luarocks", ["install", "environ", "0.1.0-1", "--server=https://luarocks.org/dev"]);
-	}
-
-	static function removeLuaVersionDependencies(version: String){
-	  removeLibs(["luarocks", version]);
 	}
 
 	static function getCsDependencies() {
@@ -867,20 +856,24 @@ class RunCi {
 						}
 					case Lua:
 						getLuaDependencies();
-						for (lua_version in ["lua5.1", "lua5.2", "lua5.3", "luajit"]){
+						var envpath = Sys.getEnv("HOME") + '/lua_env';
+						addToPATH(envpath + '/bin');
+						for (lv in ["-l5.1", "-l5.2", "-l5.3", "-j2.0", "-j2.1" ]){
 						  Sys.println('--------------------');
-						  Sys.println('Lua Version $lua_version');
-
-						  installLuaVersionDependencies(lua_version);
+						  Sys.println('Lua Version: $lv');
+						  runCommand("hererocks", [envpath, lv, "-rlatest", "-i"]);
+						  trace('path: ' + Sys.getEnv("PATH"));
+						  runCommand("lua",["-v"]);
+						  runCommand("luarocks",[]);
+						  installLuaVersionDependencies(lv);
 
 						  changeDirectory(unitDir);
 						  runCommand("haxe", ["compile-lua.hxml"].concat(args));
-						  runCommand(lua_version, ["bin/unit.lua"]);
+						  runCommand("lua", ["bin/unit.lua"]);
 
 						  changeDirectory(sysDir);
 						  runCommand("haxe", ["compile-lua.hxml"].concat(args));
-						  runCommand(lua_version, ["bin/lua/sys.lua"]);
-						  removeLuaVersionDependencies(lua_version);
+						  runCommand("lua", ["bin/lua/sys.lua"]);
 						}
 					case Cpp:
 						getCppDependencies();

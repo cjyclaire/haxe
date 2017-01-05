@@ -784,7 +784,7 @@ class RunCi {
 		}
 		Sys.println('Going to test: $tests');
 
-		for (test in tests) {
+		for (test in [Lua]) {
 			switch (ci) {
 				case TravisCI:
 					Sys.println('travis_fold:start:test-${test}');
